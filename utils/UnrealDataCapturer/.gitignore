@@ -1,6 +1,9 @@
 # Visual Studio
 .vs/
 
+#VS Code
+.vscode/
+
 # Recordings
 recordings/
 
@@ -17,3 +20,26 @@ recordings/
 
 # Generated level data
 /Content/Main_BuiltData.uasset
+
+# CMake User files
+CMakeLists.txt.user
+
+# Build folders
+build/
+
+# cpm (cmake package manager)
+cpm-package-lock.cmake
+.config
+_deps
+cpm.cmake
+
+# clang meta
+compile_commands.json
+.cache
+.clangd
+
+# user scope
+CMakeUserPresets.json
+scripts
+.gitattributes
+CMakeLocal.txt

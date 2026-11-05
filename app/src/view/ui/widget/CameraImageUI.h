@@ -16,6 +16,8 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+#include <cstdio>
+
 #include "src/view/ViewData.h"
 
 #include "src/model/DataModel.h"
@@ -216,5 +218,7 @@ public:
             printf("DUPLICATE: Camera %d in ImGui frame %d\n", frame.uniqueCamID, currentFrame);
 
         lastFrame[frame.uniqueCamID] = currentFrame;
+
+        ImGui::End();
     }
 };

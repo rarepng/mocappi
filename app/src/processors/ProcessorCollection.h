@@ -11,6 +11,7 @@
 #include "src/processors/marker/RawMarkerTriangulator.h"
 #include "src/processors/marker/MarkerPersistor.h"
 #include "src/processors/rigid/RigidBodyDetector.h"
+#include "src/processors/rigid/GroundTruthEvaluator.h"
 #include "src/processors/skeleton/SkeletalFitter.h"
 
 using namespace std::chrono;
@@ -47,6 +48,7 @@ struct ProcessorCollection {
      * Detects a rigid body from a cloud of markers using a simple brute force approach
      */
     std::shared_ptr<RigidBodyDetector> rigidBodyDetector;
+    std::shared_ptr<GroundTruthEvaluator> groundTruthEvaluator;
 
     /**
      * Fits skeletons into the found markers.

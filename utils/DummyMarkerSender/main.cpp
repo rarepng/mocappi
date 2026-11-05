@@ -26,6 +26,8 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
+#include <tuple>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -77,31 +79,49 @@ public:
 
         std::cout << "UDP target: " << receiverEndpoint_.address().to_string() << ":" << receiverEndpoint_.port() << std::endl;
 
-        receiveThread_ = std::thread([this]() { receiveLoop(); });
+        isRunning_ = true;
+        startReceive();
     }
 
     ~UDPPacketSender(){
         stop();
     }
 
+    void startReceive(){
+        receiveSocket_.async_receive_from(
+            boost::asio::buffer(receiveBuffer_), senderEndpoint_,
+            [this](const boost::system::error_code& error, std::size_t length) {
+                if (!error) {
+                    if (length >= 5 + sizeof(double) && static_cast<std::uint8_t>(receiveBuffer_[0]) == 0){
+                        double receivedHostTimestamp = 0.0;
+                        std::memcpy(&receivedHostTimestamp, receiveBuffer_.data() + 5, sizeof(receivedHostTimestamp));
+
+                        std::lock_guard<std::mutex> lock(syncMutex_);
+                        camSideTimestampOnSync_ = getCurrentCamSideTime(startTime_);
+                        hostTimestampOnSync_ = receivedHostTimestamp;
+                    }
+                }
+                
+                if (isRunning_) {
+                    startReceive();
+                }
+            });
+    }
+
     void stop(){
-        const bool wasRunning = isRunning_.exchange(false);
-
-        boost::system::error_code ignoredError;
-
-        receiveSocket_.cancel(ignoredError);
-        receiveSocket_.close(ignoredError);
-
-        if (receiveThread_.joinable()) {
-            receiveThread_.join();
-        }
+        if (!isRunning_.exchange(false)) return;
+        boost::asio::post(ioContext_, [this]() {
+            boost::system::error_code ignoredError;
+            std::ignore = receiveSocket_.cancel(ignoredError);
+            std::ignore = receiveSocket_.close(ignoredError);
+            std::ignore = socket_.close(ignoredError);
+        });
     }
 
     void resetStartTime(steady_clock::time_point startTime){
         std::lock_guard<std::mutex> lock(syncMutex_);
+        camSideTimestampOnSync_ -= duration<double>(startTime - startTime_).count();
         startTime_ = startTime;
-        hostTimestampOnSync_ = 0.0;
-        camSideTimestampOnSync_ = 0.0;
     }
 
     void send(MarkerPaket data){
@@ -110,13 +130,15 @@ public:
         auto buffer = std::make_shared<std::vector<char>>();
         serializeData(data, *buffer);
 
-        socket_.async_send_to(
-            boost::asio::buffer(*buffer),
-            receiverEndpoint_,
-            [buffer](const boost::system::error_code& error, std::size_t /*bytesSent*/) {
-                if (error)
-                    std::cerr << "UDP send error: " << error.message() << " (" << error.value() << ")" << std::endl;
-            });
+        boost::asio::post(ioContext_, [this, buffer]() {
+            socket_.async_send_to(
+                boost::asio::buffer(*buffer),
+                receiverEndpoint_,
+                [buffer](const boost::system::error_code& error, std::size_t /*bytesSent*/) {
+                    if (error && error != boost::asio::error::operation_aborted)
+                        std::cerr << "UDP send error: " << error.message() << " (" << error.value() << ")" << std::endl;
+                });
+        });
     }
 
 private:
@@ -189,7 +211,8 @@ private:
     udp::endpoint receiverEndpoint_;
     udp::socket receiveSocket_;
 
-    std::thread receiveThread_;
+    udp::endpoint senderEndpoint_;
+    std::array<char, 60000> receiveBuffer_{};
     std::atomic_bool isRunning_ = false;
 
     std::mutex syncMutex_;
@@ -268,21 +291,16 @@ std::vector<MarkerPaket> parseFile(const std::string& fileName, int camId){
     return markerPakete;
 }
 
-void normalizePacketTimestamps(std::vector<MarkerPaket>& packets, const std::string& streamName){
+void normalizePacketTimestamps(std::vector<MarkerPaket>& packets, double sharedZero, const std::string& streamName){
     if (packets.empty()) {
         return;
     }
 
-    const double firstTimestamp = packets.front().timestamp;
-
     for (MarkerPaket& packet : packets) {
-        packet.timestamp -= firstTimestamp;
-
-        if (packet.timestamp < 0.0)
-            packet.timestamp = 0.0;
+        packet.timestamp -= sharedZero;
     }
 
-    std::cout << "\tSynchronisiere " << streamName << ": erster Quell-Zeitstempel " << firstTimestamp << " wird zu 0.0 s." << std::endl;
+    std::cout << "\t" << streamName << ": first packet at +" << packets.front().timestamp * 1000.0 << " ms on the shared time base." << std::endl;
 }
 
 namespace fs = std::filesystem;
@@ -376,7 +394,7 @@ std::vector<CameraInput> findCameraFiles(const fs::path& folderPath)
 int main(int argc, char* argv[])
 {
     // Default path, is overwritten by '--folder' argument if set:
-    fs::path folderPath = fs::path(CMAKE_SOURCE_DIR) / ".." / "data" /  "new" / "test10"; //
+    fs::path folderPath = fs::path(CMAKE_SOURCE_DIR) / "pub" / "synthetic-recordings" / "tool0";
 
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -406,8 +424,6 @@ int main(int argc, char* argv[])
 
     for (CameraInput& camera : cameras) {
         camera.packets = parseFile(camera.filePath.string(), camera.cameraId);
-
-        normalizePacketTimestamps(camera.packets, "Camera " + std::to_string(camera.cameraId));
 
         for (std::size_t i = 1; i < camera.packets.size(); ++i) {
             const double difference = camera.packets[i].timestamp - camera.packets[i - 1].timestamp;
@@ -440,9 +456,26 @@ int main(int argc, char* argv[])
     if (fs::is_regular_file(groundTruthFilePath)) {
         groundTruthPakets = parseFile(groundTruthFilePath.string(), 999);
 
-        normalizePacketTimestamps(groundTruthPakets, "Ground Truth");
+        std::sort(groundTruthPakets.begin(), groundTruthPakets.end(), [](const MarkerPaket& a, const MarkerPaket& b) {
+                return a.timestamp < b.timestamp;
+        });
 
         std::cout << "\tRead " << groundTruthPakets.size() << " ground-truth frames." << std::endl;
+    }
+
+    double sharedZero = std::numeric_limits<double>::infinity();
+    for (const CameraInput& camera : cameras) {
+        if (!camera.packets.empty())
+            sharedZero = std::min(sharedZero, camera.packets.front().timestamp);
+    }
+    if (!groundTruthPakets.empty())
+        sharedZero = std::min(sharedZero, groundTruthPakets.front().timestamp);
+
+    if (sharedZero != std::numeric_limits<double>::infinity()) {
+        std::cout << "Shared time base: source timestamp " << sharedZero << " s becomes 0.0 s." << std::endl;
+        for (CameraInput& camera : cameras)
+            normalizePacketTimestamps(camera.packets, sharedZero, "Camera " + std::to_string(camera.cameraId));
+        normalizePacketTimestamps(groundTruthPakets, sharedZero, "Ground Truth");
     }
 
     const bool anyCameraData = std::any_of(cameras.begin(), cameras.end(), [](const CameraInput& camera) {
@@ -512,12 +545,12 @@ int main(int argc, char* argv[])
                 if (packetsSentThisCycle > 0) {
                     const MarkerPaket& lastPacket = camera.packets[camera.currentPacketId - 1];
 
-                    std::cout << "Cam " << camera.cameraId
-                        << " Time: " << lastPacket.timestamp
-                        << " (CamSideTime: " << currentCamSideTime
-                        << ", sent: "
-                        << packetsSentThisCycle
-                              << ")" << std::endl;
+                    // std::cout << "Cam " << camera.cameraId
+                    //     << " Time: " << lastPacket.timestamp
+                    //     << " (CamSideTime: " << currentCamSideTime
+                    //     << ", sent: "
+                    //     << packetsSentThisCycle
+                    //           << ")" << std::endl;
                 }
 
                 if (camera.currentPacketId < camera.packets.size())

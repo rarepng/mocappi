@@ -99,6 +99,15 @@ struct RigidBodyPaneUI {
                 ImGui::Indent();
 
                 ImGui::TextDisabled("%d Markers", static_cast<int>(body.markers.size()));
+
+                // added colors for significance around < 0.5 mm :)
+                if (body.groundTruthTipErrorP99 >= 0.f) {
+                    const ImVec4 colour = body.groundTruthTipErrorP99 <= 0.5f ? ImVec4(0.4f, 0.9f, 0.4f, 1.f) : ImVec4(1.f, 0.6f, 0.3f, 1.f);
+                    if (body.groundTruthTipError >= 0.f)
+                        ImGui::TextColored(colour, "Tip error %.2f mm, P99 %.2f mm (10 s)", body.groundTruthTipError, body.groundTruthTipErrorP99);
+                    else
+                        ImGui::TextColored(colour, "Tip error: lost, P99 %.2f mm (10 s)", body.groundTruthTipErrorP99);
+                }
                 ImGui::Spacing();
 
                 bool markersChanged = false;

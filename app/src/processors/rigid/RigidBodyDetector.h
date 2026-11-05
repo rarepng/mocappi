@@ -33,8 +33,12 @@ public:
     float maximumRms = 0.01f;
     float minimumSecondEigenvalueRatio = 0.01f;
 
+    int minimumTrackingInliers = 3;
+
+    float maximumLenientResidual = 0.001f;
+
     // Maximum allowed edge-length error between every pair of final inliers (meter):
-    float finalPairTolerance = 0.008f;
+    float finalPairTolerance = 0.002f;
 
     // Reject very small / almost collinear seed triangles:
     float minimumTripletArea = 0.0001f;
@@ -226,9 +230,7 @@ private:
         return worst;
     }
 
-    bool pruneAndRefit(RigidBody* rb, std::vector<Match>& matches, Mat4f& pose) const {
-        const size_t minimum = requiredInliers(rb);
-
+    bool pruneAndRefit(std::vector<Match>& matches, Mat4f& pose, size_t minimum) const {
         if(matches.size() < minimum || observability(matches) < minimumSecondEigenvalueRatio
             || !rigidTransform(matches, pose))
             return false;
@@ -349,10 +351,13 @@ private:
         return matches;
     }
 
-    Fit evaluatePose(RigidBody* rb, const Mat4f& initialPose, const std::vector<int>& candidates) const {
+    Fit evaluatePose(RigidBody* rb, const Mat4f& initialPose, const std::vector<int>& candidates, int minimumMatches) const {
+        
         Fit result;
 
-        if(candidates.size() < size_t(requiredInliers(rb)))
+        const size_t minimum = size_t(std::max(3, minimumMatches));
+
+        if(candidates.size() < minimum)
             return result;
 
         if(!initialPose.isFinite())
@@ -366,7 +371,7 @@ private:
         for(int iteration = 0; iteration < iterations; ++iteration){
             matches = assignInliers(rb, pose, candidates);
 
-            if(matches.size() < size_t(requiredInliers(rb)))
+            if(matches.size() < minimum)
                 return Fit{};
 
             if(observability(matches) < minimumSecondEigenvalueRatio)
@@ -377,7 +382,7 @@ private:
         }
 
         matches = assignInliers(rb, pose, candidates);
-        if(matches.size() < size_t(requiredInliers(rb)))
+        if(matches.size() < minimum)
             return Fit{};
 
         result.observability = observability(matches);
@@ -387,10 +392,10 @@ private:
         if(!rigidTransform(matches, result.pose)) return Fit{};
 
         matches = assignInliers(rb, result.pose, candidates);
-        if(matches.size() < size_t(requiredInliers(rb)))
+        if(matches.size() < minimum)
             return Fit{};
 
-        if(!pruneAndRefit(rb, matches, result.pose))
+        if(!pruneAndRefit(matches, result.pose, minimum))
             return Fit{};
 
         result.observability = observability(matches);
@@ -477,7 +482,7 @@ private:
                             if(!rigidTransform(seed, hypothesis))
                                 continue;
 
-                            Fit fit = evaluatePose(rb, hypothesis, candidates);
+                            Fit fit = evaluatePose(rb, hypothesis, candidates, requiredInliers(rb));
 
                             if(betterFit(fit, best))
                                 best = std::move(fit);
@@ -507,6 +512,26 @@ private:
         }
     }
 
+    bool tightenLenientFit(Fit& fit, size_t minimum) const {
+        while(true){
+            size_t worst = 0;
+            float worstResidual = 0.f;
+            for(size_t i = 0; i < fit.inliers.size(); ++i){
+                const float residual = (fit.pose * fit.inliers[i].source).distanceTo(fit.inliers[i].target);
+                if(residual > worstResidual){ worstResidual = residual; worst = i; }
+            }
+            if(worstResidual <= maximumLenientResidual)
+                return true;
+            if(fit.inliers.size() <= minimum)
+                return false;
+            fit.inliers.erase(fit.inliers.begin() + worst);
+            fit.observability = observability(fit.inliers);
+            if(fit.observability < minimumSecondEigenvalueRatio || !rigidTransform(fit.inliers, fit.pose))
+                return false;
+            fit.rms = poseRms(fit.pose, fit.inliers);
+        }
+    }
+
     void updateBody(RigidBody* rb, std::vector<bool>& usedCandidates) {
         std::vector<int> candidates;
         candidates.reserve(model.markers.size());
@@ -520,7 +545,11 @@ private:
         Fit fit;
 
         if(state.foundLastFrame){
-            fit = evaluatePose(rb, state.lastPose, candidates);
+            const int trackingInliers = std::min(requiredInliers(rb), std::max(3, minimumTrackingInliers));
+            fit = evaluatePose(rb, state.lastPose, candidates, trackingInliers);
+
+            if(fit.valid && trackingInliers < requiredInliers(rb) && !tightenLenientFit(fit, size_t(trackingInliers)))
+                fit = Fit{};
         }
 
         if(!fit.valid){
@@ -531,6 +560,7 @@ private:
             state.foundLastFrame = false;
             rb->bodyFound = false;
             ++rb->notSeenSince;
+            rb->inlierCount = 0;
 
             return;
         }
@@ -538,6 +568,7 @@ private:
         rb->pose = fit.pose;
         rb->bodyFound = true;
         rb->notSeenSince = 0;
+        rb->inlierCount = int(fit.inliers.size());
         state.lastPose = fit.pose;
         state.foundLastFrame = true;
 

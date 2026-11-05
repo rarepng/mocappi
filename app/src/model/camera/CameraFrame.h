@@ -97,8 +97,8 @@ struct CameraFrame {
                 ImageMarker interpMarker;
                 interpMarker.x = float((b.markers[bIdx].x - a.markers[aIdx].x) * alpha + a.markers[aIdx].x);
                 interpMarker.y = float((b.markers[bIdx].y - a.markers[aIdx].y) * alpha + a.markers[aIdx].y);
-                interpMarker.flowX = float((b.markers[bIdx].flowX - a.markers[aIdx].flowX) * alpha + a.markers[aIdx].flowX);
-                interpMarker.flowY = float((b.markers[bIdx].flowY - a.markers[aIdx].flowY) * alpha + a.markers[aIdx].flowY);
+                interpMarker.flowX = b.markers[bIdx].x - a.markers[aIdx].x;
+                interpMarker.flowY = b.markers[bIdx].y - a.markers[aIdx].y;
 
 
                 {

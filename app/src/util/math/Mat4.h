@@ -23,6 +23,8 @@
 /* To convert from and to a eigen matrix */
 #include <pcl/common/transforms.h>
 
+#include <type_traits>
+
 /**
  * Implementation of a 4x4 Matrix. This matrix class is intended specifically
  * for the transformation of points and vectors. This will be explained in the
@@ -34,6 +36,13 @@
  */
 
 template<typename T, typename = typename std::enable_if<std::is_arithmetic<T>::value, T>::type>
+class Mat4;
+
+// copied over from bottom
+typedef Mat4<float>  Mat4f;
+typedef Mat4<double> Mat4d;
+
+template<typename T, typename>
 class Mat4
 {
 public:

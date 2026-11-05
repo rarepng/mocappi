@@ -4,6 +4,8 @@
 
 #include "src/util/Semaphore.h"
 
+#include <list>
+
 /**
  * Manages a set of the last N recorded frames for a camera.
  *
@@ -106,5 +108,29 @@ struct CameraBuffer {
         // If no host timestamp was smaller than the desired timestamp, all frames
         // lie behind the desired timestamp and we cannot interpolate one:
         return CameraFrame();
+    }
+
+    // returns ground truth as (camera ID 999) blended with the 2 frames around it
+    std::vector<Vec4f> getGroundTruthAt(double desiredTimestamp) const {
+        const CameraFrame* newerFrame = nullptr;
+        for (auto rit = frames.rbegin(); rit != frames.rend(); ++rit) {
+            if (rit->timestamp < desiredTimestamp) {
+                if (newerFrame == nullptr || newerFrame->markers.size() != rit->markers.size())
+                    return {};
+                const double alpha = (desiredTimestamp - rit->timestamp) / (newerFrame->timestamp - rit->timestamp);
+                std::vector<Vec4f> positions;
+                positions.reserve(rit->markers.size());
+                for (size_t i = 0; i < rit->markers.size(); ++i) {
+                    const ImageMarker& a = rit->markers[i];
+                    const ImageMarker& b = newerFrame->markers[i];
+                    positions.push_back(Vec4f(float(a.x + (b.x - a.x) * alpha),
+                                              float(a.y + (b.y - a.y) * alpha),
+                                              float(a.pixels + (b.pixels - a.pixels) * alpha), 1.0f));
+                }
+                return positions;
+            }
+            newerFrame = &(*rit);
+        }
+        return {};
     }
 };

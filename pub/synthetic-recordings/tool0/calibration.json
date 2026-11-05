@@ -1,0 +1,146 @@
+[
+    {
+        "rotation": [
+            -2.530727415391778,
+            0,
+            0
+        ],
+        "translation": [
+            0,
+            5.551115123125783e-17,
+            0.7
+        ],
+        "focal_length": [
+            1065,
+            1065
+        ],
+        "principal_point": [
+            640,
+            360
+        ],
+        "calib_reprojection_error": 0,
+        "calib_distance_error": 0,
+        "calib_observation_num": 0,
+        "unique_cam_id": 1
+    },
+    {
+        "rotation": [
+            -1.868724936751514,
+            -0.6229083122505047,
+            1.0789088452748532
+        ],
+        "translation": [
+            0,
+            -2.7755575615628914e-17,
+            0.7
+        ],
+        "focal_length": [
+            1065,
+            1065
+        ],
+        "principal_point": [
+            640,
+            360
+        ],
+        "calib_reprojection_error": 0,
+        "calib_distance_error": 0,
+        "calib_observation_num": 0,
+        "unique_cam_id": 2
+    },
+    {
+        "rotation": [
+            -1.369725646750266,
+            -0.7480256969881073,
+            2.3724344126016006
+        ],
+        "translation": [
+            2.7755575615628914e-17,
+            1.3877787807814457e-17,
+            0.7
+        ],
+        "focal_length": [
+            1065,
+            1065
+        ],
+        "principal_point": [
+            640,
+            360
+        ],
+        "calib_reprojection_error": 0,
+        "calib_distance_error": 0,
+        "calib_observation_num": 0,
+        "unique_cam_id": 3
+    },
+    {
+        "rotation": [
+            -1.6659476892787045e-16,
+            -1.5707963267948966,
+            2.7206990463513265
+        ],
+        "translation": [
+            0,
+            0,
+            0.7
+        ],
+        "focal_length": [
+            1065,
+            1065
+        ],
+        "principal_point": [
+            640,
+            360
+        ],
+        "calib_reprojection_error": 0,
+        "calib_distance_error": 0,
+        "calib_observation_num": 0,
+        "unique_cam_id": 4
+    },
+    {
+        "rotation": [
+            -1.3697256467502654,
+            0.7480256969881074,
+            -2.3724344126016015
+        ],
+        "translation": [
+            -2.7755575615628914e-17,
+            2.7755575615628914e-17,
+            0.7000000000000001
+        ],
+        "focal_length": [
+            1065,
+            1065
+        ],
+        "principal_point": [
+            640,
+            360
+        ],
+        "calib_reprojection_error": 0,
+        "calib_distance_error": 0,
+        "calib_observation_num": 0,
+        "unique_cam_id": 5
+    },
+    {
+        "rotation": [
+            -1.868724936751514,
+            0.6229083122505047,
+            -1.0789088452748532
+        ],
+        "translation": [
+            0,
+            -2.7755575615628914e-17,
+            0.7
+        ],
+        "focal_length": [
+            1065,
+            1065
+        ],
+        "principal_point": [
+            640,
+            360
+        ],
+        "calib_reprojection_error": 0,
+        "calib_distance_error": 0,
+        "calib_observation_num": 0,
+        "unique_cam_id": 6
+    }
+]

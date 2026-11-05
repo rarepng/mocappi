@@ -1,0 +1,42 @@
+{
+    "tool": "array",
+    "units": "metres",
+    "markers": [
+        [
+            0.029,
+            -0.022,
+            0.059
+        ],
+        [
+            0,
+            -0.025,
+            0.071
+        ],
+        [
+            0.021,
+            0.026,
+            0.124
+        ],
+        [
+            0.03,
+            0.003,
+            0.154
+        ],
+        [
+            -0.016,
+            -0.026,
+            0.157
+        ],
+        [
+            -0.009,
+            0.033,
+            0.156
+        ]
+    ],
+    "tip": [
+        0,
+        0,
+        0
+    ],
+    "comment": "coordinates of the rigidbody for reference as would be typed into the UI in the same order as GroundTruth3D.txt and the tip is the rigidbody origin."
+}

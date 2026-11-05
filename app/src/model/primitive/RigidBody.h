@@ -58,6 +58,18 @@ struct RigidBody {
     int notSeenSince = 999;
 
     /**
+     * markers used in the last accepted fit (0 while not found).
+     */
+    int inlierCount = 0;
+
+    /**
+     * Tip error against ground truth in mm this tick
+     * and the P99 of the last 1200 found ticks. -1 when unknown.
+     */
+    float groundTruthTipError = -1.f;
+    float groundTruthTipErrorP99 = -1.f;
+
+    /**
      * The rigid body markers
      */
     std::vector<RigidBodyMarker> markers;
@@ -80,8 +92,9 @@ struct RigidBody {
     /**
      * Creates an initialized rigid body with the given markers.
      */
-    RigidBody(std::vector<RigidBodyMarker>& markers)
-        : markers(markers){
+    RigidBody(std::vector<RigidBodyMarker> markers)
+        : markers(std::move(markers))
+    {
         init();
     }
 

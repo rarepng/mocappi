@@ -268,7 +268,9 @@ int CameraDataProvider::retrieveUniqueCameraID(int cameraID, boost::asio::ip::ud
 
 void CameraDataProvider::storeFrame(CameraFrame& frame, udp::endpoint& sender_endpoint){
     if(frame.uniqueCamID == 999){
+        groundTruthFrameSet.semaphore.acquire();
         groundTruthFrameSet.insertFrame(frame);
+        groundTruthFrameSet.semaphore.release();
     } else {
         // Set correct unique camera id (in case of real camera it's the fourth IPv4 block):
         frame.uniqueCamID = retrieveUniqueCameraID(frame.uniqueCamID, sender_endpoint);
@@ -389,6 +391,10 @@ void CameraDataProvider::process(TickData& tick){
         tick.frames.push_back(std::move(frame));
         camera.second.buffer.semaphore.release();
     }
+
+    groundTruthFrameSet.semaphore.acquire();
+    tick.markersGTPos = groundTruthFrameSet.getGroundTruthAt(tick.timestamp);
+    groundTruthFrameSet.semaphore.release();
 
     model.semaphore.release();
 }

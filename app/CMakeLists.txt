@@ -13,13 +13,22 @@ endif ()
 # Define the project:
 project(MocapFramework C CXX)
 
-# Set C++ stardard:
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
+# CCache:
+find_program(CCACHE_PROGRAM ccache)
+if(CCACHE_PROGRAM)
+    message(STATUS "Using ccache: ${CCACHE_PROGRAM}")
+    set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+    set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+endif()
 
+# Set C++ stardard:
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS ON)
+
+# cmake does this automatically
 if(MSVC)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++17")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++20")
 endif(MSVC)
 
 # Enable automatic include of generated files (like paths.h):
@@ -51,12 +60,10 @@ find_package(nlohmann_json 3.2.0 REQUIRED)
 # LibSSH:
 find_package(libssh CONFIG REQUIRED)
 
-# CCache:
-find_program(CCACHE_PROGRAM ccache)
-if(CCACHE_PROGRAM)
-    message(STATUS "Using ccache: ${CCACHE_PROGRAM}")
-    set(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
-    set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
+# to compile the helper tool conveniently
+option(MOCAP_BUILD_TOOLS "Build helper tools under tools/" ON)
+if(MOCAP_BUILD_TOOLS)
+    add_subdirectory(utils/DummyMarkerSender) # can add more tools later
 endif()
 
 # Define all header files we want to compile:
@@ -93,6 +100,7 @@ set(HEADERS
     src/processors/marker/MarkerPersistor.h
     src/processors/marker/RawMarkerTriangulator.h
     src/processors/rigid/RigidBodyDetector.h
+    src/processors/rigid/GroundTruthEvaluator.h
     src/processors/skeleton/SkeletalFitter.h
 
     # View:
@@ -202,6 +210,8 @@ include_directories(src src/util/math lib/stb_image lib/tiny_obj_loader lib/ukf/
 
 # Define executables with source files and resources:
 add_executable(MocapFramework ${SOURCES} ${HEADERS} ${RESOURCES} src/pch.cpp)
+
+include(CMakeLocal.txt OPTIONAL)
 
 target_compile_definitions(MocapFramework PRIVATE UKF_SINGLE_PRECISION)
 

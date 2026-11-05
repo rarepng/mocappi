@@ -17,13 +17,20 @@ project(DummyMarkerSender C CXX)
 set(CMAKE_CXX_STANDARD 17)
 
 find_package(OpenMP REQUIRED)
-find_package(Boost 1.71.0 REQUIRED COMPONENTS system)
+find_package(Boost 1.71.0 REQUIRED)
+find_package(Threads REQUIRED)
 
 add_executable(DummyMarkerSender main.cpp)
 
 target_compile_definitions(DummyMarkerSender PUBLIC -DCMAKE_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 
-target_link_libraries(DummyMarkerSender Boost::boost Boost::system OpenMP::OpenMP_CXX)
+target_link_libraries(DummyMarkerSender PRIVATE Boost::boost Threads::Threads OpenMP::OpenMP_CXX)
+
+# MSVC links this automatically
+if(WIN32)
+    target_compile_definitions(DummyMarkerSender PRIVATE _WIN32_WINNT=0x0A00)
+    target_link_libraries(DummyMarkerSender PRIVATE ws2_32 mswsock)
+endif()
 
 
 target_include_directories(DummyMarkerSender PRIVATE ${Boost_INCLUDE_DIRS})
