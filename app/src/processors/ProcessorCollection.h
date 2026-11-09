@@ -12,6 +12,7 @@
 #include "src/processors/marker/MarkerPersistor.h"
 #include "src/processors/rigid/RigidBodyDetector.h"
 #include "src/processors/rigid/GroundTruthEvaluator.h"
+#include "src/processors/marker/MarkerLogger.h"
 #include "src/processors/skeleton/SkeletalFitter.h"
 
 using namespace std::chrono;
@@ -49,6 +50,7 @@ struct ProcessorCollection {
      */
     std::shared_ptr<RigidBodyDetector> rigidBodyDetector;
     std::shared_ptr<GroundTruthEvaluator> groundTruthEvaluator;
+    std::shared_ptr<MarkerLogger> markerLogger;
 
     /**
      * Fits skeletons into the found markers.

@@ -63,7 +63,10 @@ find_package(libssh CONFIG REQUIRED)
 # to compile the helper tool conveniently
 option(MOCAP_BUILD_TOOLS "Build helper tools under tools/" ON)
 if(MOCAP_BUILD_TOOLS)
-    add_subdirectory(utils/DummyMarkerSender) # can add more tools later
+    add_subdirectory(
+        ${CMAKE_CURRENT_SOURCE_DIR}/../utils/DummyMarkerSender
+        ${CMAKE_CURRENT_BINARY_DIR}/utils/DummyMarkerSender
+        ) # can add more tools later
 endif()
 
 # Define all header files we want to compile:
@@ -98,6 +101,7 @@ set(HEADERS
     src/processors/input/CameraDataProvider.h
     src/processors/input/TickProvider.h
     src/processors/marker/MarkerPersistor.h
+    src/processors/marker/MarkerLogger.h
     src/processors/marker/RawMarkerTriangulator.h
     src/processors/rigid/RigidBodyDetector.h
     src/processors/rigid/GroundTruthEvaluator.h

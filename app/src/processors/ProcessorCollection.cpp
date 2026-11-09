@@ -12,6 +12,7 @@ ProcessorCollection::ProcessorCollection(DataModel& model)
     markerPersistor = std::make_shared<MarkerPersistor>(model);
     rigidBodyDetector = std::make_shared<RigidBodyDetector>(model);
     groundTruthEvaluator = std::make_shared<GroundTruthEvaluator>(model);
+    markerLogger = std::make_shared<MarkerLogger>(model);
     skeletalFitter = std::make_shared<SkeletalFitter>(model);
 
     // Processes the next marker pakets when available in a separate thread
@@ -70,6 +71,7 @@ ProcessorCollection::ProcessorCollection(DataModel& model)
             endTimeMeasure("Rigid Body Detector");
 
             groundTruthEvaluator->process(tick);
+            markerLogger->process(tick);
 
             startTimeMeasure("Skeletal Fitter");
             skeletalFitter->process(tick);
