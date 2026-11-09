@@ -380,12 +380,14 @@ public:
         bool wasChanged = false;
 
         // If mouse is down, simply add the difference to viewPositionX and viewPositionY (ROTATION):
-        if(ImGui::IsMouseDown(ImGuiMouseButton_Left) && !ImGui::GetIO().WantCaptureMouse){
+        if(Settings::instance.leftTabOpenIdx == 0 && ImGui::IsMouseDown(ImGuiMouseButton_Left) && !ImGui::GetIO().WantCaptureMouse){
             ImVec2 mouseDelta = ImGui::GetMousePos() - lastMousePosition;
 
             // Add the delta to mouseMovementX and mouseMovementY:
-            viewPositionX -= mouseDelta.x * 0.01f;
-            viewPositionY -= mouseDelta.y * 0.01f;
+            constexpr float orbitSensitivity = 0.3f * (M_PI / 180.0f);
+            constexpr float maxPitch = 89.0f * (M_PI / 180.0f);
+            viewPositionX = std::fmod(viewPositionX - mouseDelta.x * orbitSensitivity, 2.0f * M_PI);
+            viewPositionY = std::clamp(viewPositionY - mouseDelta.y * orbitSensitivity, -maxPitch, maxPitch);
 
             wasChanged = true;
         }
@@ -395,14 +397,14 @@ public:
 
 
         // If middle mouse is down, shift viewTarget (OFFSET):
-        if(ImGui::IsMouseDown(ImGuiMouseButton_Middle) && !ImGui::GetIO().WantCaptureMouse){
+        if(Settings::instance.leftTabOpenIdx == 0 && ImGui::IsMouseDown(ImGuiMouseButton_Middle) && !ImGui::GetIO().WantCaptureMouse){
             ImVec2 mouseDelta = ImGui::GetMousePos() - lastMousePosition;
 
             Mat4f invRotationMat = rotationMat.inverse();
             Vec4f xDir = invRotationMat * Vec4f(1, 0, 0, 0);
             Vec4f yDir = invRotationMat * Vec4f(0, 1, 0, 0);
 
-            viewTarget = viewTarget + (-xDir * mouseDelta.x * 0.002f * viewDistance) + (yDir * mouseDelta.y * 0.002f * sqrt(viewDistance));
+            viewTarget = viewTarget + (-xDir * mouseDelta.x * 0.002f * viewDistance) + (yDir * mouseDelta.y * 0.002f * viewDistance);
 
             wasChanged = true;
         }
@@ -418,6 +420,32 @@ public:
         }*/
 
         // If mouse wheel moved, change the view distance to the scene mid point:
+        ImVec2 mousePos = ImGui::GetMousePos();
+        bool is3DViewHovered = Settings::instance.leftTabOpenIdx == 0
+                               && !ImGui::GetIO().WantCaptureMouse
+                               && mousePos.x >= float(MENU_WIDTH) && mousePos.x < float(MENU_WIDTH + display_w)
+                               && mousePos.y >= 0.f && mousePos.y < float(display_h);
+        if(is3DViewHovered && !ImGui::GetIO().WantTextInput){
+            Mat4f invRotationMat = rotationMat.inverse();
+            Vec4f rightDir = invRotationMat * Vec4f(1.f, 0.f, 0.f, 0.f);
+            Vec4f upDir = invRotationMat * Vec4f(0.f, 1.f, 0.f, 0.f);
+            Vec4f forwardDir = invRotationMat * Vec4f(0.f, 0.f, 1.f, 0.f);
+            Vec4f moveDir(0.f, 0.f, 0.f, 0.f);
+            if(ImGui::IsKeyDown(ImGuiKey_W)) moveDir = moveDir + forwardDir;
+            if(ImGui::IsKeyDown(ImGuiKey_S)) moveDir = moveDir - forwardDir;
+            if(ImGui::IsKeyDown(ImGuiKey_D)) moveDir = moveDir + rightDir;
+            if(ImGui::IsKeyDown(ImGuiKey_A)) moveDir = moveDir - rightDir;
+            if(ImGui::IsKeyDown(ImGuiKey_E)) moveDir = moveDir + upDir;
+            if(ImGui::IsKeyDown(ImGuiKey_Q)) moveDir = moveDir - upDir;
+            if(moveDir.squaredLength() > 0.f){
+                float speedMultiplier = 1.0f;
+                if(ImGui::GetIO().KeyShift) speedMultiplier *= 4.0f;
+                if(ImGui::GetIO().KeyCtrl) speedMultiplier *= 0.25f;
+                float step = std::max(viewDistance, 0.02f) * speedMultiplier * ImGui::GetIO().DeltaTime;
+                viewTarget = viewTarget + moveDir.normalized() * step;
+                wasChanged = true;
+            }
+        }
         if(ImGui::GetIO().MouseWheel != 0){
             viewDistance *= ImGui::GetIO().MouseWheel > 0 ? 0.9f : 1.1f;
         }
@@ -471,14 +499,22 @@ public:
 
                     Vec4f color = Vec4f(0.f, 1.f, 1.f, 1.f);
                     unlitColorShader->setUniform("model", calibration.getModelMatrix());
-                    unlitColorShader->setUniform("color", color);
-
-                    for(ImageMarker& marker : frame.markers){
-                        Vec4f m2D = marker.getCoordinates();
-                        Vec4f ray = calibration.getRay(m2D.x, m2D.y);
-                        drawLine(Vec4f(), Vec4f(ray.x * 5, ray.y * 5, ray.z * 5, 1));
+                    unlitColorShader->setUniform("color", Vec4f(0.5f, 0.5f, 1.f));
+                    for(Vec4f intersection : model.lastTick.triangulationIntersections){
+                        unlitColorShader->setUniform("model", Mat4f::translation(intersection.x, intersection.y, intersection.z) * Mat4f::scale(0.005f));
+                        sphereMesh->render();
                     }
                 }
+                // if(wasChanged){
+                //     float crossSize = std::max(0.002f, viewDistance * 0.025f);
+                //     unlitColorShader->setUniform("model", Mat4f());
+                //     unlitColorShader->setUniform("color", Vec4f(1.f, 0.2f, 0.2f, 1.f));
+                //     drawLine(viewTarget - Vec4f(crossSize, 0.f, 0.f, 0.f), viewTarget + Vec4f(crossSize, 0.f, 0.f, 0.f));
+                //     unlitColorShader->setUniform("color", Vec4f(0.2f, 1.f, 0.2f, 1.f));
+                //     drawLine(viewTarget - Vec4f(0.f, crossSize, 0.f, 0.f), viewTarget + Vec4f(0.f, crossSize, 0.f, 0.f));
+                //     unlitColorShader->setUniform("color", Vec4f(0.2f, 0.6f, 1.f, 1.f));
+                //     drawLine(viewTarget - Vec4f(0.f, 0.f, crossSize, 0.f), viewTarget + Vec4f(0.f, 0.f, crossSize, 0.f));
+                // }
             }
             glEnable(GL_DEPTH_TEST);
         }
