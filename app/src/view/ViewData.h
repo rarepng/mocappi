@@ -31,5 +31,5 @@ struct ViewData {
     }
 
 private:
-    static ViewData* instance;
+    static inline ViewData* instance{nullptr};
 };

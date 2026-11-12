@@ -184,10 +184,6 @@ set(SOURCES
     src/processors/marker/RawMarkerTriangulator.cpp
     src/processors/skeleton/SkeletalFitter.cpp
 
-    # View:
-    src/view/View.cpp
-    src/view/ViewData.cpp
-
     # GL stuff
     src/util/gl/Shader.cpp
     src/util/gl/Texture2D.cpp

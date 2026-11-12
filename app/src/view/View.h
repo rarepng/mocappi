@@ -446,8 +446,28 @@ public:
                 wasChanged = true;
             }
         }
-        if(ImGui::GetIO().MouseWheel != 0){
-            viewDistance *= ImGui::GetIO().MouseWheel > 0 ? 0.9f : 1.1f;
+        if(is3DViewHovered && ImGui::GetIO().MouseWheel != 0.0f){
+            float wheel = ImGui::GetIO().MouseWheel;
+            float zoomMultiplier = 1.0f;
+            if(ImGui::GetIO().KeyShift) zoomMultiplier *= 4.0f;
+            if(ImGui::GetIO().KeyCtrl) zoomMultiplier *= 0.25f;
+            constexpr float minDistance = 0.02f;
+            constexpr float maxDistance = 50.0f;
+            constexpr float minStep = 0.005f;
+            float step = std::max(viewDistance * 0.15f, minStep) * zoomMultiplier * std::abs(wheel);
+            if(wheel > 0.0f){
+                if(viewDistance - step >= minDistance){
+                    viewDistance -= step;
+                } else {
+                    float push = minDistance - (viewDistance - step);
+                    viewDistance = minDistance;
+                    Vec4f forwardDir = (rotationMat.inverse() * Vec4f(0.f, 0.f, 1.f, 0.f)).normalized();
+                    viewTarget = viewTarget + forwardDir * push;
+                }
+            } else {
+                viewDistance = std::min(viewDistance + step, maxDistance);
+            }
+            wasChanged = true;
         }
 
         // Store this mouse position for the next frame:
@@ -466,7 +486,7 @@ public:
         glCullFace(GL_FRONT);
 
         // Get projection matrix:
-        Mat4f projection = Mat4f::perspectiveTransformation(aspectRatio);
+        Mat4f projection = Mat4f::perspectiveTransformation(aspectRatio, 75.f, 0.001f, 100.f);
 
         // Generate the view matrix by using the rotation matrix and translate the camera
         // by the distance to the scene mid point:
@@ -499,22 +519,13 @@ public:
 
                     Vec4f color = Vec4f(0.f, 1.f, 1.f, 1.f);
                     unlitColorShader->setUniform("model", calibration.getModelMatrix());
-                    unlitColorShader->setUniform("color", Vec4f(0.5f, 0.5f, 1.f));
-                    for(Vec4f intersection : model.lastTick.triangulationIntersections){
-                        unlitColorShader->setUniform("model", Mat4f::translation(intersection.x, intersection.y, intersection.z) * Mat4f::scale(0.005f));
-                        sphereMesh->render();
+                    unlitColorShader->setUniform("color", color);
+                    for(ImageMarker& marker : frame.markers){
+                        Vec4f m2D = marker.getCoordinates();
+                        Vec4f ray = calibration.getRay(m2D.x, m2D.y);
+                        drawLine(Vec4f(), Vec4f(ray.x * 5, ray.y * 5, ray.z * 5, 1));
                     }
                 }
-                // if(wasChanged){
-                //     float crossSize = std::max(0.002f, viewDistance * 0.025f);
-                //     unlitColorShader->setUniform("model", Mat4f());
-                //     unlitColorShader->setUniform("color", Vec4f(1.f, 0.2f, 0.2f, 1.f));
-                //     drawLine(viewTarget - Vec4f(crossSize, 0.f, 0.f, 0.f), viewTarget + Vec4f(crossSize, 0.f, 0.f, 0.f));
-                //     unlitColorShader->setUniform("color", Vec4f(0.2f, 1.f, 0.2f, 1.f));
-                //     drawLine(viewTarget - Vec4f(0.f, crossSize, 0.f, 0.f), viewTarget + Vec4f(0.f, crossSize, 0.f, 0.f));
-                //     unlitColorShader->setUniform("color", Vec4f(0.2f, 0.6f, 1.f, 1.f));
-                //     drawLine(viewTarget - Vec4f(0.f, 0.f, crossSize, 0.f), viewTarget + Vec4f(0.f, 0.f, crossSize, 0.f));
-                // }
             }
             glEnable(GL_DEPTH_TEST);
         }
@@ -605,6 +616,17 @@ public:
                 unlitColorShader->setUniform("model", Mat4f::translation(intersection.x, intersection.y, intersection.z) * Mat4f::scale(0.005f));
                 sphereMesh->render();
             }
+        }
+
+        if(wasChanged){
+            float crossSize = std::max(0.002f, viewDistance * 0.025f);
+            unlitColorShader->setUniform("model", Mat4f());
+            unlitColorShader->setUniform("color", Vec4f(1.f, 0.2f, 0.2f, 1.f));
+            drawLine(viewTarget - Vec4f(crossSize, 0.f, 0.f, 0.f), viewTarget + Vec4f(crossSize, 0.f, 0.f, 0.f));
+            unlitColorShader->setUniform("color", Vec4f(0.2f, 1.f, 0.2f, 1.f));
+            drawLine(viewTarget - Vec4f(0.f, crossSize, 0.f, 0.f), viewTarget + Vec4f(0.f, crossSize, 0.f, 0.f));
+            unlitColorShader->setUniform("color", Vec4f(0.2f, 0.6f, 1.f, 1.f));
+            drawLine(viewTarget - Vec4f(0.f, 0.f, crossSize, 0.f), viewTarget + Vec4f(0.f, 0.f, crossSize, 0.f));
         }
 
         unlitColorShader->setUniform("color", Vec4f(1.f, 0.f, 0.f));
